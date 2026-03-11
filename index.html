@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>URLPattern API Playground</title>
+<meta name="description" content="Interactive playground for the URLPattern API. Test patterns, extract named groups, build routers, and compare with regex.">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d1117;--surface:#161b22;--surface2:#21262d;--border:#30363d;
+  --text:#e6edf3;--text2:#8b949e;--accent:#58a6ff;--accent2:#3fb950;
+  --red:#f85149;--orange:#d29922;--purple:#bc8cff;
+  --mono:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+  --radius:8px;
+}
+html{font-size:15px}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);line-height:1.6;min-height:100vh}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+
+/* Layout */
+.container{max-width:1100px;margin:0 auto;padding:1.5rem}
+header{text-align:center;padding:2.5rem 1rem 1.5rem;border-bottom:1px solid var(--border)}
+header h1{font-size:1.8rem;font-weight:700;margin-bottom:.4rem}
+header h1 span{color:var(--accent)}
+header p{color:var(--text2);font-size:.95rem;max-width:600px;margin:0 auto}
+
+/* Browser support */
+.support-bar{display:flex;align-items:center;justify-content:center;gap:.75rem;margin-top:1rem;flex-wrap:wrap}
+.support-badge{font-size:.8rem;padding:.25rem .6rem;border-radius:99px;font-weight:600;display:flex;align-items:center;gap:.35rem}
+.support-badge.yes{background:#3fb95022;color:var(--accent2);border:1px solid #3fb95044}
+.support-badge.no{background:#f8514922;color:var(--red);border:1px solid #f8514944}
+.support-badge.partial{background:#d2992222;color:var(--orange);border:1px solid #d2992244}
+.support-live{font-size:.8rem;padding:.25rem .6rem;border-radius:99px;font-weight:600;display:flex;align-items:center;gap:.35rem}
+.support-live.supported{background:#3fb95022;color:var(--accent2);border:1px solid #3fb95044}
+.support-live.unsupported{background:#f8514922;color:var(--red);border:1px solid #f8514944}
+
+/* Tabs */
+.tabs{display:flex;gap:0;border-bottom:2px solid var(--border);margin:1.5rem 0 0;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{padding:.65rem 1.1rem;cursor:pointer;color:var(--text2);font-size:.85rem;font-weight:500;
+  border-bottom:2px solid transparent;margin-bottom:-2px;white-space:nowrap;transition:color .15s}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+
+/* Panels */
+.panel{display:none;padding:1.5rem 0}
+.panel.active{display:block}
+.panel h2{font-size:1.2rem;margin-bottom:.3rem}
+.panel .desc{color:var(--text2);font-size:.88rem;margin-bottom:1.2rem}
+
+/* Form elements */
+label{display:block;font-size:.82rem;color:var(--text2);margin-bottom:.3rem;font-weight:500}
+input[type="text"],textarea,select{width:100%;background:var(--surface);border:1px solid var(--border);
+  color:var(--text);font-family:var(--mono);font-size:.88rem;padding:.55rem .75rem;border-radius:var(--radius);
+  outline:none;transition:border-color .15s}
+input[type="text"]:focus,textarea:focus{border-color:var(--accent)}
+textarea{resize:vertical;min-height:60px}
+select{cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%238b949e'%3E%3Cpath d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right .75rem center}
+
+.input-group{margin-bottom:1rem}
+.input-row{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+@media(max-width:640px){.input-row{grid-template-columns:1fr}}
+
+button{background:var(--accent);color:#fff;border:none;padding:.5rem 1rem;border-radius:var(--radius);
+  font-size:.85rem;font-weight:600;cursor:pointer;transition:opacity .15s}
+button:hover{opacity:.85}
+button.secondary{background:var(--surface2);color:var(--text)}
+button.small{padding:.3rem .6rem;font-size:.78rem}
+button.danger{background:var(--red)}
+
+/* Result areas */
+.result-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:1rem;margin-top:1rem;font-family:var(--mono);font-size:.85rem;overflow-x:auto;white-space:pre-wrap;word-break:break-all}
+.result-box.match{border-color:var(--accent2)}
+.result-box.no-match{border-color:var(--red)}
+
+.match-indicator{display:inline-block;padding:.15rem .5rem;border-radius:99px;font-size:.78rem;font-weight:700;margin-bottom:.5rem}
+.match-indicator.yes{background:#3fb95022;color:var(--accent2)}
+.match-indicator.no{background:#f8514922;color:var(--red)}
+
+.group-tag{display:inline-block;background:var(--accent);color:#fff;padding:.1rem .4rem;border-radius:4px;
+  font-size:.75rem;margin:.1rem .15rem;font-weight:600}
+.group-val{color:var(--accent2);font-weight:600}
+
+/* Code block */
+.code-block{position:relative;background:#0d1117;border:1px solid var(--border);border-radius:var(--radius);
+  padding:1rem;margin-top:1rem;font-family:var(--mono);font-size:.82rem;overflow-x:auto;white-space:pre;line-height:1.7}
+.code-block .copy-btn{position:absolute;top:.5rem;right:.5rem;background:var(--surface2);color:var(--text2);
+  border:1px solid var(--border);padding:.25rem .5rem;border-radius:4px;font-size:.72rem;cursor:pointer}
+.code-block .copy-btn:hover{color:var(--text)}
+
+/* Presets */
+.presets{display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:1rem}
+.preset{background:var(--surface2);color:var(--text2);border:1px solid var(--border);padding:.25rem .6rem;
+  border-radius:99px;font-size:.78rem;cursor:pointer;font-family:var(--mono);transition:all .15s}
+.preset:hover,.preset.active{border-color:var(--accent);color:var(--accent)}
+
+/* Router table */
+.route-table{width:100%;border-collapse:collapse;margin-top:.75rem;font-size:.85rem}
+.route-table th{text-align:left;padding:.5rem;border-bottom:2px solid var(--border);color:var(--text2);font-weight:600}
+.route-table td{padding:.5rem;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:.82rem}
+.route-table tr.matched{background:#3fb95011}
+.route-table tr.matched td:first-child{color:var(--accent2);font-weight:700}
+.route-actions{display:flex;gap:.3rem}
+
+/* Component grid */
+.comp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:.75rem;margin-top:1rem}
+.comp-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:.75rem}
+.comp-card h4{font-size:.82rem;color:var(--text2);margin-bottom:.3rem}
+.comp-card .val{font-family:var(--mono);font-size:.88rem;color:var(--accent2);word-break:break-all}
+.comp-card.no-match .val{color:var(--red)}
+
+/* Regex comparison */
+.regex-row{display:grid;grid-template-columns:120px 1fr;gap:.5rem;align-items:center;padding:.4rem 0;
+  border-bottom:1px solid var(--border);font-size:.85rem}
+.regex-row:last-child{border-bottom:none}
+.regex-label{color:var(--text2);font-weight:600;font-size:.8rem}
+.regex-val{font-family:var(--mono);color:var(--purple);word-break:break-all}
+
+/* Footer */
+footer{text-align:center;padding:2rem 1rem;color:var(--text2);font-size:.8rem;border-top:1px solid var(--border);margin-top:2rem}
+</style>
+</head>
+<body>
+
+<header>
+  <h1><span>URLPattern</span> API Playground</h1>
+  <p>Test URL patterns, extract named groups, build routers, and explore the browser-native pattern matching API.</p>
+  <div class="support-bar">
+    <span class="support-badge yes">Chrome 95+</span>
+    <span class="support-badge yes">Edge 95+</span>
+    <span class="support-badge yes">Deno</span>
+    <span class="support-badge partial">Firefox 132+ (flag)</span>
+    <span class="support-badge no">Safari</span>
+    <span id="liveSupport" class="support-live unsupported">Checking...</span>
+  </div>
+</header>
+
+<div class="container">
+  <div class="tabs" id="tabs">
+    <div class="tab active" data-tab="matcher">Pattern Matcher</div>
+    <div class="tab" data-tab="groups">Named Groups</div>
+    <div class="tab" data-tab="wildcards">Wildcards</div>
+    <div class="tab" data-tab="components">Component Matching</div>
+    <div class="tab" data-tab="router">Router Builder</div>
+    <div class="tab" data-tab="regex">Regex Comparison</div>
+  </div>
+
+  <!-- Pattern Matcher -->
+  <div class="panel active" id="panel-matcher">
+    <h2>Pattern Matcher</h2>
+    <p class="desc">Enter a URL pattern and test URLs against it. See match results and extracted groups.</p>
+
+    <label>Presets</label>
+    <div class="presets" id="matcher-presets"></div>
+
+    <div class="input-row">
+      <div class="input-group">
+        <label>Pattern (pathname)</label>
+        <input type="text" id="m-pattern" value="/users/:id/posts/:postId" placeholder="/users/:id">
+      </div>
+      <div class="input-group">
+        <label>Test URL</label>
+        <input type="text" id="m-url" value="https://example.com/users/42/posts/hello-world" placeholder="https://example.com/users/42">
+      </div>
+    </div>
+    <div class="input-group">
+      <label>Base URL (optional)</label>
+      <input type="text" id="m-base" value="https://example.com" placeholder="https://example.com">
+    </div>
+    <button onclick="runMatcher()">Test Match</button>
+
+    <div id="m-result"></div>
+    <div id="m-code"></div>
+  </div>
+
+  <!-- Named Groups -->
+  <div class="panel" id="panel-groups">
+    <h2>Named Groups</h2>
+    <p class="desc">Extract named parameters from URLs using <code>:name</code> syntax. Supports optional (<code>:name?</code>) and custom regex (<code>:id(\\d+)</code>).</p>
+
+    <label>Presets</label>
+    <div class="presets" id="groups-presets"></div>
+
+    <div class="input-row">
+      <div class="input-group">
+        <label>Pattern</label>
+        <input type="text" id="g-pattern" value="/api/:version/users/:id(\\d+)" placeholder="/api/:version/users/:id">
+      </div>
+      <div class="input-group">
+        <label>Test URL</label>
+        <input type="text" id="g-url" value="https://api.example.com/api/v2/users/1337" placeholder="https://api.example.com/api/v2/users/42">
+      </div>
+    </div>
+    <button onclick="runGroups()">Extract Groups</button>
+
+    <div id="g-result"></div>
+    <div id="g-code"></div>
+  </div>
+
+  <!-- Wildcards -->
+  <div class="panel" id="panel-wildcards">
+    <h2>Wildcards</h2>
+    <p class="desc">Use <code>*</code> to match any sequence of characters. The matched content is captured in group <code>0</code>.</p>
+
+    <label>Presets</label>
+    <div class="presets" id="wildcards-presets"></div>
+
+    <div class="input-row">
+      <div class="input-group">
+        <label>Pattern</label>
+        <input type="text" id="w-pattern" value="/static/*.:ext" placeholder="/files/*">
+      </div>
+      <div class="input-group">
+        <label>Test URL</label>
+        <input type="text" id="w-url" value="https://cdn.example.com/static/images/hero.png" placeholder="https://cdn.example.com/static/styles/main.css">
+      </div>
+    </div>
+    <button onclick="runWildcards()">Test Wildcard</button>
+
+    <div id="w-result"></div>
+    <div id="w-code"></div>
+  </div>
+
+  <!-- Component Matching -->
+  <div class="panel" id="panel-components">
+    <h2>Component Matching</h2>
+    <p class="desc">Match individual URL components: protocol, hostname, pathname, search, and hash.</p>
+
+    <div class="input-group">
+      <label>Protocol</label>
+      <input type="text" id="c-protocol" value="https" placeholder="https (leave empty to match any)">
+    </div>
+    <div class="input-row">
+      <div class="input-group">
+        <label>Hostname</label>
+        <input type="text" id="c-hostname" value=":sub.example.com" placeholder="*.example.com">
+      </div>
+      <div class="input-group">
+        <label>Pathname</label>
+        <input type="text" id="c-pathname" value="/docs/:page" placeholder="/docs/*">
+      </div>
+    </div>
+    <div class="input-row">
+      <div class="input-group">
+        <label>Search</label>
+        <input type="text" id="c-search" value="" placeholder="tab=:tab (leave empty to match any)">
+      </div>
+      <div class="input-group">
+        <label>Hash</label>
+        <input type="text" id="c-hash" value="" placeholder=":section (leave empty to match any)">
+      </div>
+    </div>
+    <div class="input-group">
+      <label>Test URL</label>
+      <input type="text" id="c-url" value="https://docs.example.com/docs/getting-started" placeholder="https://docs.example.com/docs/intro">
+    </div>
+    <button onclick="runComponents()">Test Components</button>
+
+    <div id="c-result"></div>
+    <div id="c-code"></div>
+  </div>
+
+  <!-- Router Builder -->
+  <div class="panel" id="panel-router">
+    <h2>Router Builder</h2>
+    <p class="desc">Define multiple route patterns and test which one matches a given URL. First match wins.</p>
+
+    <div id="route-list"></div>
+    <div style="display:flex;gap:.5rem;margin:1rem 0">
+      <input type="text" id="r-new-pattern" placeholder="Pattern, e.g. /products/:id" style="flex:1">
+      <input type="text" id="r-new-handler" placeholder="Handler name" style="flex:1">
+      <button onclick="addRoute()">Add Route</button>
+    </div>
+    <div class="input-group">
+      <label>Test URL</label>
+      <input type="text" id="r-url" value="https://example.com/api/users/42" placeholder="https://example.com/products/123">
+    </div>
+    <button onclick="runRouter()">Find Match</button>
+
+    <div id="r-result"></div>
+    <div id="r-code"></div>
+  </div>
+
+  <!-- Regex Comparison -->
+  <div class="panel" id="panel-regex">
+    <h2>Regex Comparison</h2>
+    <p class="desc">See the equivalent regular expressions that URLPattern compiles for each URL component.</p>
+
+    <label>Presets</label>
+    <div class="presets" id="regex-presets"></div>
+
+    <div class="input-group">
+      <label>Pattern (pathname)</label>
+      <input type="text" id="x-pattern" value="/users/:id(\\d+)/posts/:slug" placeholder="/users/:id">
+    </div>
+    <div class="input-group">
+      <label>Base URL</label>
+      <input type="text" id="x-base" value="https://example.com" placeholder="https://example.com">
+    </div>
+    <button onclick="runRegex()">Show Regex</button>
+
+    <div id="x-result"></div>
+    <div id="x-code"></div>
+  </div>
+</div>
+
+<footer>
+  URLPattern API Playground &mdash; No external dependencies. Vanilla JS + CSS.
+  <br>API Spec: <a href="https://urlpattern.spec.whatwg.org/" target="_blank" rel="noopener">urlpattern.spec.whatwg.org</a>
+  &middot; <a href="https://developer.mozilla.org/en-US/docs/Web/API/URLPattern" target="_blank" rel="noopener">MDN Docs</a>
+</footer>
+
+<script>
+// --- Browser support check ---
+(function() {
+  const el = document.getElementById('liveSupport');
+  if (typeof URLPattern !== 'undefined') {
+    el.textContent = 'Your browser: Supported';
+    el.classList.remove('unsupported');
+    el.classList.add('supported');
+  } else {
+    el.textContent = 'Your browser: Not supported';
+  }
+})();
+
+// --- Tabs ---
+document.getElementById('tabs').addEventListener('click', e => {
+  const tab = e.target.closest('.tab');
+  if (!tab) return;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  tab.classList.add('active');
+  document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
+});
+
+// --- Presets ---
+const PRESETS = {
+  matcher: [
+    { label: 'REST User', pattern: '/users/:id', url: 'https://example.com/users/42' },
+    { label: 'Nested Resource', pattern: '/users/:id/posts/:postId', url: 'https://example.com/users/42/posts/hello-world' },
+    { label: 'File Extension', pattern: '/assets/*.:ext', url: 'https://example.com/assets/img/logo.svg' },
+    { label: 'API Version', pattern: '/api/:version/:resource', url: 'https://example.com/api/v2/products' },
+    { label: 'Blog Post', pattern: '/blog/:year-:month-:day/:slug', url: 'https://example.com/blog/2026-03-12/hello-world' },
+    { label: 'Catch-All', pattern: '/*', url: 'https://example.com/any/path/here' },
+  ],
+  groups: [
+    { label: 'Typed ID', pattern: '/api/:version/users/:id(\\d+)', url: 'https://api.example.com/api/v2/users/1337' },
+    { label: 'Locale Route', pattern: '/:locale([a-z]{2})/:page', url: 'https://example.com/en/about' },
+    { label: 'Date Path', pattern: '/archive/:year(\\d{4})/:month(\\d{2})', url: 'https://example.com/archive/2026/03' },
+    { label: 'Slug Only', pattern: '/posts/:slug([a-z0-9-]+)', url: 'https://example.com/posts/my-first-post' },
+    { label: 'Multi Segment', pattern: '/:org/:repo/tree/:branch/:path+', url: 'https://example.com/yurukusa/urlpattern/tree/main/src/index.js' },
+    { label: 'Optional Param', pattern: '/search/:query/:page?', url: 'https://example.com/search/hello' },
+  ],
+  wildcards: [
+    { label: 'Static Files', pattern: '/static/*.:ext', url: 'https://cdn.example.com/static/images/hero.png' },
+    { label: 'Catch All', pattern: '/*', url: 'https://example.com/anything/goes/here' },
+    { label: 'Prefixed', pattern: '/api/*', url: 'https://example.com/api/v1/users/42' },
+    { label: 'Nested Wild', pattern: '/docs/:lang/*', url: 'https://example.com/docs/en/guides/setup' },
+    { label: 'Double Wild', pattern: '/*/:file.:ext', url: 'https://example.com/deep/nested/path/readme.md' },
+    { label: 'Extension Only', pattern: '/*.:ext(css|js|svg)', url: 'https://cdn.example.com/app/main.js' },
+  ],
+  regex: [
+    { label: 'Typed Params', pattern: '/users/:id(\\d+)/posts/:slug' },
+    { label: 'Simple', pattern: '/about' },
+    { label: 'Wildcard', pattern: '/files/*' },
+    { label: 'Multi Params', pattern: '/api/:version/:resource/:id' },
+    { label: 'Extension', pattern: '/*.:ext' },
+    { label: 'Optional', pattern: '/search/:query/:page?' },
+  ]
+};
+
+function renderPresets(containerId, presets, onClick) {
+  const container = document.getElementById(containerId);
+  presets.forEach((p, i) => {
+    const btn = document.createElement('span');
+    btn.className = 'preset';
+    btn.textContent = p.label;
+    btn.onclick = () => onClick(p, i);
+    container.appendChild(btn);
+  });
+}
+
+renderPresets('matcher-presets', PRESETS.matcher, p => {
+  document.getElementById('m-pattern').value = p.pattern;
+  document.getElementById('m-url').value = p.url;
+  runMatcher();
+});
+renderPresets('groups-presets', PRESETS.groups, p => {
+  document.getElementById('g-pattern').value = p.pattern;
+  document.getElementById('g-url').value = p.url;
+  runGroups();
+});
+renderPresets('wildcards-presets', PRESETS.wildcards, p => {
+  document.getElementById('w-pattern').value = p.pattern;
+  document.getElementById('w-url').value = p.url;
+  runWildcards();
+});
+renderPresets('regex-presets', PRESETS.regex, p => {
+  document.getElementById('x-pattern').value = p.pattern;
+  runRegex();
+});
+
+// --- Helpers ---
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function copyCode(btn) {
+  const block = btn.parentElement;
+  const text = block.textContent.replace('Copy', '').replace('Copied!', '').trim();
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = 'Copy', 1500);
+  });
+}
+
+function codeBlock(code) {
+  return `<div class="code-block"><button class="copy-btn" onclick="copyCode(this)">Copy</button>${esc(code)}</div>`;
+}
+
+function renderGroups(result) {
+  if (!result) return '<span class="match-indicator no">No Match</span>';
+  let html = '<span class="match-indicator yes">Match</span>\n\n';
+  const components = ['protocol', 'username', 'password', 'hostname', 'port', 'pathname', 'search', 'hash'];
+  for (const comp of components) {
+    const g = result[comp];
+    if (!g) continue;
+    const groups = g.groups;
+    const hasGroups = groups && Object.keys(groups).length > 0;
+    if (!hasGroups && !g.input) continue;
+    html += `<strong>${comp}</strong>: input="${esc(g.input || '')}"`;
+    if (hasGroups) {
+      html += '\n  Groups: ';
+      for (const [k, v] of Object.entries(groups)) {
+        html += `<span class="group-tag">${esc(k)}</span> = <span class="group-val">"${esc(v || '')}"</span>  `;
+      }
+    }
+    html += '\n';
+  }
+  return html;
+}
+
+function notSupportedHtml() {
+  return '<div class="result-box no-match"><span class="match-indicator no">URLPattern API not supported in this browser</span>\nPlease use Chrome 95+, Edge 95+, or Deno.</div>';
+}
+
+// --- Pattern Matcher ---
+function runMatcher() {
+  if (typeof URLPattern === 'undefined') { document.getElementById('m-result').innerHTML = notSupportedHtml(); return; }
+  const patternStr = document.getElementById('m-pattern').value.trim();
+  const urlStr = document.getElementById('m-url').value.trim();
+  const baseStr = document.getElementById('m-base').value.trim();
+  try {
+    const opts = { pathname: patternStr };
+    if (baseStr) opts.baseURL = baseStr;
+    const pattern = new URLPattern(opts);
+    const result = pattern.exec(urlStr);
+    const matched = !!result;
+    document.getElementById('m-result').innerHTML =
+      `<div class="result-box ${matched ? 'match' : 'no-match'}">${renderGroups(result)}</div>`;
+
+    const code = `const pattern = new URLPattern({ pathname: ${JSON.stringify(patternStr)} });
+const result = pattern.exec(${JSON.stringify(urlStr)});
+
+if (result) {
+  console.log('Match!', result.pathname.groups);
+  // ${result ? JSON.stringify(result.pathname.groups) : '{}'}
+} else {
+  console.log('No match');
+}`;
+    document.getElementById('m-code').innerHTML = codeBlock(code);
+  } catch (e) {
+    document.getElementById('m-result').innerHTML =
+      `<div class="result-box no-match"><span class="match-indicator no">Error</span>\n${esc(e.message)}</div>`;
+    document.getElementById('m-code').innerHTML = '';
+  }
+}
+
+// --- Named Groups ---
+function runGroups() {
+  if (typeof URLPattern === 'undefined') { document.getElementById('g-result').innerHTML = notSupportedHtml(); return; }
+  const patternStr = document.getElementById('g-pattern').value.trim();
+  const urlStr = document.getElementById('g-url').value.trim();
+  try {
+    const pattern = new URLPattern({ pathname: patternStr });
+    const result = pattern.exec(urlStr);
+    const matched = !!result;
+    let html = `<div class="result-box ${matched ? 'match' : 'no-match'}">`;
+    if (matched) {
+      html += '<span class="match-indicator yes">Match</span>\n\n';
+      html += '<strong>Extracted Groups:</strong>\n';
+      const groups = result.pathname.groups;
+      for (const [k, v] of Object.entries(groups)) {
+        html += `  <span class="group-tag">:${esc(k)}</span> = <span class="group-val">"${esc(v || '')}"</span>\n`;
+      }
+    } else {
+      html += '<span class="match-indicator no">No Match</span>';
+    }
+    html += '</div>';
+    document.getElementById('g-result').innerHTML = html;
+
+    const code = `const pattern = new URLPattern({ pathname: ${JSON.stringify(patternStr)} });
+const result = pattern.exec(${JSON.stringify(urlStr)});
+
+if (result) {
+  const { ${result ? Object.keys(result.pathname.groups).join(', ') : '...'} } = result.pathname.groups;
+  ${result ? Object.entries(result.pathname.groups).map(([k,v]) => `// ${k} = "${v}"`).join('\n  ') : ''}
+}`;
+    document.getElementById('g-code').innerHTML = codeBlock(code);
+  } catch (e) {
+    document.getElementById('g-result').innerHTML =
+      `<div class="result-box no-match"><span class="match-indicator no">Error</span>\n${esc(e.message)}</div>`;
+    document.getElementById('g-code').innerHTML = '';
+  }
+}
+
+// --- Wildcards ---
+function runWildcards() {
+  if (typeof URLPattern === 'undefined') { document.getElementById('w-result').innerHTML = notSupportedHtml(); return; }
+  const patternStr = document.getElementById('w-pattern').value.trim();
+  const urlStr = document.getElementById('w-url').value.trim();
+  try {
+    const pattern = new URLPattern({ pathname: patternStr });
+    const result = pattern.exec(urlStr);
+    const matched = !!result;
+    let html = `<div class="result-box ${matched ? 'match' : 'no-match'}">`;
+    if (matched) {
+      html += '<span class="match-indicator yes">Match</span>\n\n';
+      html += '<strong>Captured Groups:</strong>\n';
+      const groups = result.pathname.groups;
+      for (const [k, v] of Object.entries(groups)) {
+        const label = /^\d+$/.test(k) ? `wildcard[${k}]` : `:${k}`;
+        html += `  <span class="group-tag">${esc(label)}</span> = <span class="group-val">"${esc(v || '')}"</span>\n`;
+      }
+    } else {
+      html += '<span class="match-indicator no">No Match</span>';
+    }
+    html += '</div>';
+    document.getElementById('w-result').innerHTML = html;
+
+    const code = `const pattern = new URLPattern({ pathname: ${JSON.stringify(patternStr)} });
+const result = pattern.exec(${JSON.stringify(urlStr)});
+
+if (result) {
+  const groups = result.pathname.groups;
+  ${result ? Object.entries(result.pathname.groups).map(([k,v]) => `// groups[${JSON.stringify(k)}] = "${v}"`).join('\n  ') : ''}
+}`;
+    document.getElementById('w-code').innerHTML = codeBlock(code);
+  } catch (e) {
+    document.getElementById('w-result').innerHTML =
+      `<div class="result-box no-match"><span class="match-indicator no">Error</span>\n${esc(e.message)}</div>`;
+    document.getElementById('w-code').innerHTML = '';
+  }
+}
+
+// --- Component Matching ---
+function runComponents() {
+  if (typeof URLPattern === 'undefined') { document.getElementById('c-result').innerHTML = notSupportedHtml(); return; }
+  const opts = {};
+  const fields = ['protocol', 'hostname', 'pathname', 'search', 'hash'];
+  const ids = ['c-protocol', 'c-hostname', 'c-pathname', 'c-search', 'c-hash'];
+  fields.forEach((f, i) => {
+    const v = document.getElementById(ids[i]).value.trim();
+    if (v) opts[f] = v;
+  });
+  const urlStr = document.getElementById('c-url').value.trim();
+  try {
+    const pattern = new URLPattern(opts);
+    const result = pattern.exec(urlStr);
+    const matched = !!result;
+
+    let html = `<div class="result-box ${matched ? 'match' : 'no-match'}">`;
+    html += `<span class="match-indicator ${matched ? 'yes' : 'no'}">${matched ? 'Match' : 'No Match'}</span>`;
+    html += '</div>';
+
+    if (matched) {
+      html += '<div class="comp-grid">';
+      for (const comp of ['protocol', 'hostname', 'pathname', 'search', 'hash']) {
+        const r = result[comp];
+        const groups = r && r.groups ? Object.entries(r.groups) : [];
+        html += `<div class="comp-card${r ? '' : ' no-match'}">`;
+        html += `<h4>${comp}</h4>`;
+        html += `<div class="val">${esc(r?.input || '(empty)')}</div>`;
+        if (groups.length > 0) {
+          html += '<div style="margin-top:.4rem">';
+          for (const [k, v] of groups) {
+            html += `<span class="group-tag">${esc(k)}</span> <span class="group-val">${esc(v || '')}</span> `;
+          }
+          html += '</div>';
+        }
+        html += '</div>';
+      }
+      html += '</div>';
+    }
+    document.getElementById('c-result').innerHTML = html;
+
+    const optsCode = JSON.stringify(opts, null, 2);
+    const code = `const pattern = new URLPattern(${optsCode});
+const result = pattern.exec(${JSON.stringify(urlStr)});
+
+if (result) {
+  console.log('protocol:', result.protocol.groups);
+  console.log('hostname:', result.hostname.groups);
+  console.log('pathname:', result.pathname.groups);
+  console.log('search:', result.search.groups);
+  console.log('hash:', result.hash.groups);
+}`;
+    document.getElementById('c-code').innerHTML = codeBlock(code);
+  } catch (e) {
+    document.getElementById('c-result').innerHTML =
+      `<div class="result-box no-match"><span class="match-indicator no">Error</span>\n${esc(e.message)}</div>`;
+    document.getElementById('c-code').innerHTML = '';
+  }
+}
+
+// --- Router Builder ---
+let routes = [
+  { pattern: '/', handler: 'home' },
+  { pattern: '/api/users/:id', handler: 'getUser' },
+  { pattern: '/api/users', handler: 'listUsers' },
+  { pattern: '/api/posts/:id/comments/:commentId?', handler: 'getComment' },
+  { pattern: '/static/*.:ext', handler: 'serveStatic' },
+  { pattern: '/*', handler: 'notFound' },
+];
+
+function renderRouteTable() {
+  let html = '<table class="route-table"><thead><tr><th>#</th><th>Pattern</th><th>Handler</th><th></th></tr></thead><tbody>';
+  routes.forEach((r, i) => {
+    html += `<tr id="route-${i}"><td>${i + 1}</td><td>${esc(r.pattern)}</td><td>${esc(r.handler)}</td>`;
+    html += `<td class="route-actions"><button class="small danger" onclick="removeRoute(${i})">Remove</button></td></tr>`;
+  });
+  html += '</tbody></table>';
+  document.getElementById('route-list').innerHTML = html;
+}
+
+function addRoute() {
+  const p = document.getElementById('r-new-pattern').value.trim();
+  const h = document.getElementById('r-new-handler').value.trim();
+  if (!p || !h) return;
+  routes.push({ pattern: p, handler: h });
+  document.getElementById('r-new-pattern').value = '';
+  document.getElementById('r-new-handler').value = '';
+  renderRouteTable();
+}
+
+function removeRoute(i) {
+  routes.splice(i, 1);
+  renderRouteTable();
+}
+
+function runRouter() {
+  if (typeof URLPattern === 'undefined') { document.getElementById('r-result').innerHTML = notSupportedHtml(); return; }
+  const urlStr = document.getElementById('r-url').value.trim();
+  let matchedIndex = -1;
+  let matchResult = null;
+
+  // Clear previous highlights
+  document.querySelectorAll('.route-table tr').forEach(tr => tr.classList.remove('matched'));
+
+  for (let i = 0; i < routes.length; i++) {
+    try {
+      const pattern = new URLPattern({ pathname: routes[i].pattern });
+      const result = pattern.exec(urlStr);
+      if (result) {
+        matchedIndex = i;
+        matchResult = result;
+        break;
+      }
+    } catch (e) {
+      // Skip invalid patterns
+    }
+  }
+
+  if (matchedIndex >= 0) {
+    const row = document.getElementById(`route-${matchedIndex}`);
+    if (row) row.classList.add('matched');
+
+    let html = `<div class="result-box match">`;
+    html += `<span class="match-indicator yes">Route #${matchedIndex + 1}: ${esc(routes[matchedIndex].handler)}</span>\n\n`;
+    html += `Pattern: ${esc(routes[matchedIndex].pattern)}\n`;
+    const groups = matchResult.pathname.groups;
+    if (Object.keys(groups).length > 0) {
+      html += '\nParams:\n';
+      for (const [k, v] of Object.entries(groups)) {
+        html += `  <span class="group-tag">${esc(k)}</span> = <span class="group-val">"${esc(v || '')}"</span>\n`;
+      }
+    }
+    html += '</div>';
+    document.getElementById('r-result').innerHTML = html;
+  } else {
+    document.getElementById('r-result').innerHTML =
+      '<div class="result-box no-match"><span class="match-indicator no">No route matched</span></div>';
+  }
+
+  const routeDefs = routes.map(r => `  { pattern: new URLPattern({ pathname: ${JSON.stringify(r.pattern)} }), handler: ${JSON.stringify(r.handler)} }`).join(',\n');
+  const code = `const routes = [\n${routeDefs}\n];
+
+function match(url) {
+  for (const route of routes) {
+    const result = route.pattern.exec(url);
+    if (result) {
+      return { handler: route.handler, params: result.pathname.groups };
+    }
+  }
+  return null;
+}
+
+const matched = match(${JSON.stringify(urlStr)});
+// ${matchedIndex >= 0 ? `{ handler: "${routes[matchedIndex].handler}", params: ${JSON.stringify(matchResult?.pathname?.groups || {})} }` : 'null'}`;
+  document.getElementById('r-code').innerHTML = codeBlock(code);
+}
+
+renderRouteTable();
+
+// --- Regex Comparison ---
+function runRegex() {
+  if (typeof URLPattern === 'undefined') { document.getElementById('x-result').innerHTML = notSupportedHtml(); return; }
+  const patternStr = document.getElementById('x-pattern').value.trim();
+  const baseStr = document.getElementById('x-base').value.trim();
+  try {
+    const opts = { pathname: patternStr };
+    if (baseStr) opts.baseURL = baseStr;
+    const pattern = new URLPattern(opts);
+
+    const components = ['protocol', 'hostname', 'pathname', 'search', 'hash'];
+    let html = '<div class="result-box">';
+    html += '<strong>Compiled URLPattern internal regex equivalents:</strong>\n\n';
+    for (const comp of components) {
+      // Access the pattern's component pattern strings
+      const compPattern = pattern[comp];
+      if (compPattern !== undefined) {
+        html += `<div class="regex-row"><span class="regex-label">${comp}</span><span class="regex-val">${esc(String(compPattern))}</span></div>`;
+      }
+    }
+    html += '\n\n<strong>Manual regex equivalent for pathname:</strong>\n';
+
+    // Build a manual regex from the pattern string for comparison
+    const manualRegex = pathnameToRegex(patternStr);
+    html += `<div class="regex-row"><span class="regex-label">pathname regex</span><span class="regex-val">${esc(manualRegex)}</span></div>`;
+
+    html += '</div>';
+    document.getElementById('x-result').innerHTML = html;
+
+    const code = `// URLPattern compiles patterns into internal regular expressions.
+// The pattern property shows the normalized pattern string.
+const pattern = new URLPattern({ pathname: ${JSON.stringify(patternStr)} });
+
+// Component pattern strings (normalized):
+// pattern.protocol  => ${JSON.stringify(pattern.protocol)}
+// pattern.hostname  => ${JSON.stringify(pattern.hostname)}
+// pattern.pathname  => ${JSON.stringify(pattern.pathname)}
+// pattern.search    => ${JSON.stringify(pattern.search)}
+// pattern.hash      => ${JSON.stringify(pattern.hash)}
+
+// Approximate manual regex for pathname:
+// ${manualRegex}`;
+    document.getElementById('x-code').innerHTML = codeBlock(code);
+  } catch (e) {
+    document.getElementById('x-result').innerHTML =
+      `<div class="result-box no-match"><span class="match-indicator no">Error</span>\n${esc(e.message)}</div>`;
+    document.getElementById('x-code').innerHTML = '';
+  }
+}
+
+function pathnameToRegex(pattern) {
+  // Approximate conversion of URLPattern pathname syntax to regex
+  let regex = pattern;
+  // Named groups with custom regex :name(regex)
+  regex = regex.replace(/:(\w+)\(([^)]+)\)\?/g, '(?<$1>$2)?');
+  regex = regex.replace(/:(\w+)\(([^)]+)\)\+/g, '(?<$1>(?:$2)(?:/(?:$2))*)');
+  regex = regex.replace(/:(\w+)\(([^)]+)\)/g, '(?<$1>$2)');
+  // Optional named groups :name?
+  regex = regex.replace(/:(\w+)\?/g, '(?<$1>[^/]+)?');
+  // Repeating named groups :name+
+  regex = regex.replace(/:(\w+)\+/g, '(?<$1>[^/]+(?:/[^/]+)*)');
+  // Named groups :name
+  regex = regex.replace(/:(\w+)/g, '(?<$1>[^/]+)');
+  // Wildcards * (captured as unnamed group)
+  regex = regex.replace(/\*/g, '(.*)');
+  // Escape dots
+  regex = regex.replace(/\./g, '\\.');
+  return `^${regex}$`;
+}
+
+// --- Auto-run on Enter key ---
+document.querySelectorAll('input[type="text"]').forEach(input => {
+  input.addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    const panel = input.closest('.panel');
+    if (!panel) return;
+    const id = panel.id.replace('panel-', '');
+    const runners = { matcher: runMatcher, groups: runGroups, wildcards: runWildcards, components: runComponents, router: runRouter, regex: runRegex };
+    if (runners[id]) runners[id]();
+  });
+});
+
+// --- Initial runs ---
+runMatcher();
+</script>
+
+</body>
+</html>
